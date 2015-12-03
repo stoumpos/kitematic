@@ -13,6 +13,7 @@ import router from '../router';
 
 let _retryPromise = null;
 let _timers = [];
+let useNative = util.isNative() ? util.isNative() : true;
 
 export default {
   simulateProgress (estimateSeconds) {
@@ -29,6 +30,14 @@ export default {
   clearTimers () {
     _timers.forEach(t => clearTimeout(t));
     _timers = [];
+  },
+
+  useVbox () {
+    metrics.track('Retried Setup with VBox');
+    useNative = false;
+    localStorage.setItem('setting.useNative', false);
+    router.get().transitionTo('loading');
+    _retryPromise.resolve();
   },
 
   retry (removeVM) {
@@ -51,15 +60,37 @@ export default {
     return _retryPromise.promise;
   },
 
-  setup() {
-    return util.isLinux() ? this.nativeSetup() : this.nonNativeSetup();
+  async setup () {
+    while (true) {
+      try {
+        console.log('Checking setup type....');
+        if (useNative) {
+          localStorage.setItem('setting.useNative', true);
+          let stats = fs.statSync('/var/run/docker.sock');
+          if (stats.isSocket()) {
+            await this.nativeSetup();
+          } else {
+            throw new Error('File found is not a socket');
+          }
+        } else {
+          await this.nonNativeSetup();
+        }
+        break;
+      } catch (error) {
+        router.get().transitionTo('setup', null, {native: useNative});
+        setupServerActions.error({ error: { message: 'No Docker socket found.' }});
+        await this.pause();
+        continue;
+      }
+    }
   },
 
   async nativeSetup () {
+    console.log('Native setup');
     while (true) {
       try {
-        docker.setup('localhost', machine.name());
-        docker.isDockerRunning();
+        docker.setup(util.isLinux()? 'localhost' : 'docker.local', machine.name());
+        // docker.isDockerRunning();
 
         break;
       } catch (error) {
@@ -80,6 +111,7 @@ export default {
   },
 
   async nonNativeSetup () {
+    console.log('Non-native setup');
     let virtualBoxVersion = null;
     let machineVersion = null;
     while (true) {

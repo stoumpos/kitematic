@@ -22,17 +22,23 @@ export default {
     if (!ip || !name) {
       throw new Error('Falsy ip or name passed to docker client setup');
     }
+    this.host = ip;
 
-    if (util.isLinux()) {
-      this.host = 'localhost';
-      this.client = new dockerode({socketPath: '/var/run/docker.sock'});
+    if (ip.indexOf('local') !== -1) {
+      console.log('Setting up socket');
+      try {
+        this.client = new dockerode({socketPath: '/var/run/docker.sock'});
+        console.log(this.client);
+      } catch (error) {
+        throw new Error('Cannot connect to the Docker daemon. Is the daemon running?');
+      }
     } else {
+      console.log('Setting up VM machine');
       let certDir = path.join(util.home(), '.docker/machine/machines/', name);
       if (!fs.existsSync(certDir)) {
         throw new Error('Certificate directory does not exist');
       }
 
-      this.host = ip;
       this.client = new dockerode({
         protocol: 'https',
         host: ip,
@@ -158,6 +164,7 @@ export default {
   fetchAllContainers () {
     this.client.listContainers({all: true}, (err, containers) => {
       if (err) {
+        console.error(err);
         return;
       }
       async.map(containers, (container, callback) => {
@@ -173,6 +180,7 @@ export default {
         containers = containers.filter(c => c !== null);
         if (err) {
           // TODO: add a global error handler for this
+          console.error(err);
           return;
         }
         containerServerActions.allUpdated({containers: _.indexBy(containers.concat(_.values(this.placeholders)), 'Name')});
@@ -381,6 +389,8 @@ export default {
       timestamps: 1
     }, (err, logStream) => {
       if (err) {
+        // socket hang up can be captured
+        console.error(err);
         return;
       }
 
@@ -407,6 +417,8 @@ export default {
       timestamps: 1
     }, (err, logStream) => {
       if (err) {
+        // Socket hang up also can be found here
+        console.error(err);
         return;
       }
 

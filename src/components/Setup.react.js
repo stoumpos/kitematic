@@ -32,6 +32,10 @@ var Setup = React.createClass({
     setupActions.retry(false);
   },
 
+  handleUseVbox: function () {
+    setupActions.useVbox();
+  },
+
   handleErrorRemoveRetry: function () {
     console.log('Deleting VM and trying again.' );
     setupActions.retry(true);
@@ -91,7 +95,11 @@ var Setup = React.createClass({
         );
       }
     } else {
-      if (this.state.started) {
+      if (this.props.query.native) {
+        deleteVmAndRetry = (
+          <button className="btn btn-action" onClick={this.handleUseVbox}>Use VirtualBox</button>
+        );
+      } else if (this.state.started) {
         deleteVmAndRetry = (
           <button className="btn btn-action" onClick={this.handleErrorRemoveRetry}>Delete VM &amp; Retry Setup</button>
         );

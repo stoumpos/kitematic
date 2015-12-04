@@ -125,7 +125,12 @@ export default {
         return;
       }
 
-      containerData.Cmd = image.Config.Cmd || 'bash';
+      if (!image.Config.Entrypoint && !image.Config.Cmd) {
+        containerData.Entrypoint = 'bash';
+      } else {
+        containerData.Entrypoint = image.Config.Entrypoint;
+        containerData.Cmd = image.Config.Cmd;
+      }
       let existing = this.client.getContainer(name);
       existing.kill(() => {
         existing.remove(() => {
